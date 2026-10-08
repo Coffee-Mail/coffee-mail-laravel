@@ -43,16 +43,3 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
-
-      - name: Notify Packagist
-        if: env.HAS_PACKAGIST_TOKEN == 'true'
-        env:
-          HAS_PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN != '' && secrets.PACKAGIST_USERNAME != '' }}
-          PACKAGIST_USER: ${{ secrets.PACKAGIST_USERNAME }}
-          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
-        run: |
-          echo "Notifying Packagist for coffeemail/coffeemail-laravel..."
-          curl -s -f -X POST \
-            -H "Content-Type: application/json" \
-            "https://packagist.org/api/update-package?username=${PACKAGIST_USER}&apiToken=${PACKAGIST_TOKEN}" \
-            -d '{"repository":{"url":"https://github.com/Coffee-Mail/coffee-mail-laravel"}}' || true
