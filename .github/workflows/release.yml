@@ -1,0 +1,58 @@
+name: Release coffeemail/coffeemail-laravel
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Verify and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json, mbstring
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --no-check-lock
+
+      - name: Configure VCS repository for SDK PHP
+        run: |
+          composer config repositories.sdk-php vcs https://github.com/Coffee-Mail/coffee-mail-sdk-php.git
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-progress
+
+      - name: Verify code standards, types and tests
+        run: composer check
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+      - name: Notify Packagist
+        if: env.HAS_PACKAGIST_TOKEN == 'true'
+        env:
+          HAS_PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN != '' && secrets.PACKAGIST_USERNAME != '' }}
+          PACKAGIST_USER: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
+        run: |
+          echo "Notifying Packagist for coffeemail/coffeemail-laravel..."
+          curl -s -f -X POST \
+            -H "Content-Type: application/json" \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USER}&apiToken=${PACKAGIST_TOKEN}" \
+            -d '{"repository":{"url":"https://github.com/Coffee-Mail/coffee-mail-laravel"}}' || true
