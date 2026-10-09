@@ -27,3 +27,32 @@ test('mail manager successfully resolves coffeemail mailer driver', function ():
 
     expect($mailer)->toBeInstanceOf(Mailer::class);
 });
+
+test('facade exposes every SDK resource as a property, exactly as the README shows', function (): void {
+    $recursos = [
+        'emails' => \CoffeeMail\Resources\Emails::class,
+        'webhooks' => \CoffeeMail\Resources\Webhooks::class,
+        'domains' => \CoffeeMail\Resources\Domains::class,
+        'templates' => \CoffeeMail\Resources\Templates::class,
+        'audiences' => \CoffeeMail\Resources\Audiences::class,
+        'broadcasts' => \CoffeeMail\Resources\Broadcasts::class,
+        'suppressions' => \CoffeeMail\Resources\Suppressions::class,
+        'senders' => \CoffeeMail\Resources\Senders::class,
+        'stats' => \CoffeeMail\Resources\Stats::class,
+    ];
+
+    $client = app(CoffeeMail::class);
+
+    foreach ($recursos as $propriedade => $classe) {
+        expect($client->{$propriedade})->toBeInstanceOf($classe);
+    }
+});
+
+test('facade resources are properties, not methods — calling them would fatal', function (): void {
+    $client = app(CoffeeMail::class);
+
+    expect(method_exists($client, 'templates'))->toBeFalse()
+        ->and(method_exists($client, 'domains'))->toBeFalse()
+        ->and(property_exists($client, 'templates'))->toBeTrue()
+        ->and(property_exists($client, 'domains'))->toBeTrue();
+});
