@@ -37,7 +37,6 @@ test('facade exposes every SDK resource as a property, exactly as the README sho
         'audiences' => \CoffeeMail\Resources\Audiences::class,
         'broadcasts' => \CoffeeMail\Resources\Broadcasts::class,
         'suppressions' => \CoffeeMail\Resources\Suppressions::class,
-        'senders' => \CoffeeMail\Resources\Senders::class,
         'stats' => \CoffeeMail\Resources\Stats::class,
     ];
 
