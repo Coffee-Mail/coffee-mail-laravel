@@ -44,3 +44,6 @@ jobs:
 
       - name: Tests (pest)
         run: composer test
+
+      - name: Code standards (sem else/elseif/switch)
+        run: composer check:standards

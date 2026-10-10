@@ -53,7 +53,8 @@ final class CoffeeMailTransport extends AbstractTransport
 
         $payload = $this->buildEmailPayload($rawMessage);
 
-        [$data, $error] = $this->client->emails->send($payload);
+        $response = $this->client->emails->send($payload);
+        $error = $response->error;
 
         if ($error !== null) {
             $errorMessage = $error->getMessage();
@@ -65,6 +66,8 @@ final class CoffeeMailTransport extends AbstractTransport
                 $error
             );
         }
+
+        $data = $response->data;
 
         if (is_array($data) && isset($data['id']) && is_string($data['id'])) {
             $message->setMessageId($data['id']);
