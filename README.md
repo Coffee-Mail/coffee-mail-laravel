@@ -1,6 +1,6 @@
 # CoffeeMail Laravel
 
-[![Latest Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://packagist.org/packages/coffeemail/coffeemail-laravel)
+[![Latest Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://packagist.org/packages/coffeemail/coffeemail-laravel)
 [![PHP Version](https://img.shields.io/badge/php-8.2%2B-8892BF.svg)](https://php.net)
 [![Laravel Version](https://img.shields.io/badge/laravel-10.x%20|%2011.x%20|%2012.x-FF2D20.svg)](https://laravel.com)
 [![License](https://img.shields.io/badge/license-proprietary-green.svg)](LICENSE)
@@ -15,7 +15,7 @@ Driver e conector oficial do **CoffeeMail** para o framework **Laravel**. Permit
 * **Integração Symfony Mailer:** Compatível com o motor moderno de envio de mensagens do Laravel 10.x, 11.x e 12.x.
 * **Suporte Completo a Filas (Queues):** Despacho assíncrono nativo com retries automáticos via `ShouldQueue`.
 * **Anexos e Cabeçalhos Customizados:** Mapeamento automático de anexos em base64, idempotência e modo Sandbox.
-* **Facade Integrada:** Acesso rápido aos recursos do SDK (`CoffeeMail::templates()`, `CoffeeMail::domains()`, etc.).
+* **Facade Integrada:** Acesso rápido aos recursos do SDK (`CoffeeMail::templates`, `CoffeeMail::domains`, etc.).
 * **Middleware de Webhooks:** Validação criptográfica HMAC SHA-256 de webhooks com disparo de eventos do Laravel.
 
 ---
@@ -172,13 +172,13 @@ Você pode acessar os recursos de templates, domínios, audiências e estatísti
 use CoffeeMail\Laravel\Facades\CoffeeMail;
 
 // Listar modelos de e-mail cadastrados
-[$templates, $error] = CoffeeMail::templates()->list();
+[$templates, $error] = CoffeeMail::templates->list();
 
 // Verificar status de apontamento DNS de um domínio
-[$domain, $error] = CoffeeMail::domains()->verify('dom_123');
+[$domain, $error] = CoffeeMail::domains->verify('dom_123');
 
 // Consultar métricas de entrega
-[$stats, $error] = CoffeeMail::stats()->get([
+[$stats, $error] = CoffeeMail::stats->get([
     'from' => '2026-01-01',
     'to' => '2026-01-31',
 ]);
