@@ -42,7 +42,7 @@ Pacote Composer `coffeemail/coffeemail-laravel`, construído sobre o SDK PHP [`c
 | --- | --- | --- |
 | Mail transport | `CoffeeMail\Laravel\Transport\CoffeeMailTransport` | Transport do Symfony Mailer registrado no `MailManager` como `coffeemail`. Converte o `Symfony\Component\Mime\Email` montado pelo Laravel em `EmailPayload` e chama `emails->send()` do SDK (`POST /v1/product/emails`). |
 | Facade | `CoffeeMail\Laravel\Facades\CoffeeMail` | Acesso ao client `CoffeeMail\CoffeeMail` do SDK, registrado como singleton no container (alias `coffeemail`). |
-| Webhooks | `CoffeeMail\Laravel\Http\Middleware\VerifyWebhookSignature` + `CoffeeMail\Laravel\Events\WebhookReceived` | Middleware `coffeemail.webhook` que valida HMAC SHA-256 e dispara um evento Laravel. **Veja a limitação em [Status](#-status-do-projeto).** |
+| Webhooks | `CoffeeMail\Laravel\Http\Middleware\VerifyWebhookSignature` + `CoffeeMail\Laravel\Events\WebhookReceived` | Middleware `coffeemail.webhook` que valida a assinatura `x-webhook-*` da API e dispara um evento Laravel. |
 
 Fluxo de envio:
 
@@ -63,11 +63,11 @@ O ServiceProvider (`CoffeeMail\Laravel\CoffeeMailServiceProvider`) e o alias `Co
 
 - **Publicado no Packagist** como `coffeemail/coffeemail-laravel` **v0.1.0** (2026-10-08), gerado a partir do commit `79f1cb8`. A `main` está à frente da tag: arquivo `LICENSE`, PHPStan nível 9, gate `check:standards` e ajuste interno no transport ainda não foram para uma release.
 - **Pré-1.0.** A superfície pública pode receber adições; ver [Versionamento](#-versionamento-e-releases).
-- **Middleware de webhooks incompatível com a API atual.** A API CoffeeMail assina webhooks com o cabeçalho `x-webhook-signature`, valor `sha256=<hex>`, calculado sobre `"{x-webhook-timestamp}.{x-webhook-idempotency-key}.{corpo}"`. O middleware deste pacote procura `x-coffeemail-signature`, `coffeemail-signature` ou `signature` e compara com o HMAC do **corpo puro**, sem prefixo. Resultado: entregas reais da API são rejeitadas com `401`. Há um contorno em [Webhooks](#-webhooks).
+- **A `0.2.0` (em `main`, não publicada) corrige o middleware de webhooks** e exige o SDK PHP `0.2.0`. Na `v0.1.0`, o middleware lia `x-coffeemail-signature` e comparava o HMAC do corpo puro, então rejeitava toda entrega real. Veja o [CHANGELOG](CHANGELOG.md).
 - **Payload do evento:** a API envia `{ "event_type", "webhook_id", "data" }`; não existe chave `event`.
 - **`tags` e `metadata` de Mailables não são mapeados** para o campo `tags` do CoffeeMail. O Laravel os transforma em cabeçalhos `X-Tag` / `X-Metadata-<chave>`, que o transport repassa como cabeçalhos customizados; com várias tags, só a última sobrevive (as chaves de `headers` colidem).
 - **Base URL fixa.** O SDK PHP aponta para `https://api.coffeemail.com.br` sem opção de override, e o timeout é o default do SDK (10 s); nenhum dos dois é configurável por este pacote.
-- **Dependência do SDK.** `composer.json` aceita `^0.1.0 || 0.1.x-dev || dev-main`. Com `minimum-stability: stable` uma app instala o SDK **v0.1.0** do Packagist. A `main` do SDK tem métodos e correções de endpoint ainda não publicados (marcados com † na [Referência](#-referência)); `$client->senders` só existe nela.
+- **Dependência do SDK.** `composer.json` aceita `^0.2.0 || 0.2.x-dev || dev-main`. Enquanto o SDK PHP `0.2.0` não for publicado, a `main` deste pacote só instala com o SDK em `dev-main` (repositório VCS ou `path`).
 - **Sem fake próprio.** Não há `CoffeeMail::fake()`; nos testes da sua app use `Mail::fake()` do Laravel.
 
 ## 📋 Requisitos
@@ -77,7 +77,7 @@ O ServiceProvider (`CoffeeMail\Laravel\CoffeeMailServiceProvider`) e o alias `Co
 | PHP | `^8.2` (CI roda 8.2, 8.3 e 8.4) |
 | `illuminate/mail`, `illuminate/support` | `^10.0 \|\| ^11.0 \|\| ^12.0` |
 | `symfony/mailer` | `^6.2 \|\| ^7.0` |
-| `coffeemail/coffeemail-php` | `^0.1.0 \|\| 0.1.x-dev \|\| dev-main` |
+| `coffeemail/coffeemail-php` | `^0.2.0 \|\| 0.2.x-dev \|\| dev-main` |
 | Extensões | `ext-curl` e `ext-json` (exigidas pelo SDK PHP) |
 
 Uma API key da organização (`cm_live_...`), criada no dashboard do CoffeeMail, e um domínio remetente verificado.
@@ -134,7 +134,8 @@ O `id` devolvido pela API vira o Message-ID do `SentMessage` retornado pelo Lara
 | --- | --- | --- | --- | --- |
 | `api_key` | `COFFEEMAIL_API_KEY` | `string\|null` | `null` | API key usada pelo singleton da facade e, por padrão, pelo mailer. Se vazia, o SDK ainda tenta `getenv('COFFEEMAIL_API_KEY')`; sem nenhuma, o construtor do client lança `CoffeeMail\Exceptions\AuthenticationError`. |
 | `locale` | `COFFEEMAIL_LOCALE` | `string` | `'pt-BR'` | Enviado como `Accept-Language` e usado nas mensagens de erro do SDK. Suportados pelo SDK: `pt-BR`, `en`. |
-| `webhook_secret` | `COFFEEMAIL_WEBHOOK_SECRET` | `string\|null` | `null` | Segredo HMAC do middleware `coffeemail.webhook`. Sem ele, o middleware responde `500`. |
+| `webhook_secret` | `COFFEEMAIL_WEBHOOK_SECRET` | `string\|null` | `null` | Segredo (`whsec_...`) do middleware `coffeemail.webhook`. Sem ele, o middleware responde `500`. |
+| `webhook_tolerance` | `COFFEEMAIL_WEBHOOK_TOLERANCE` | `int` | `300` | Janela, em segundos, aceita entre `x-webhook-timestamp` e o relógio local. Fora dela, `401` (proteção contra replay). |
 
 ### Mailer em `config/mail.php`
 
@@ -254,7 +255,7 @@ Métodos chamáveis direto pela facade:
 | `CoffeeMail::getLocale()` | `string` | — |
 | `CoffeeMail::getTransport()` | `HttpTransportInterface` | — |
 
-As tabelas abaixo refletem o SDK PHP na `main`. † = existe só na `main` do SDK (não publicado na v0.1.0). Prefixo comum dos endpoints: `/v1/product`.
+As tabelas abaixo refletem o SDK PHP `0.2.0`, exigido por este pacote. Prefixo comum dos endpoints: `/v1/product`.
 
 ### Mailables
 
@@ -334,8 +335,8 @@ Com `ShouldQueue`, `send()` enfileira o Mailable na fila padrão do Laravel; o t
 | `get(string $id)` | `GET /domains/{id}` |
 | `verify(string $id)` | `POST /domains/{id}/verify` |
 | `delete(string $id)` | `DELETE /domains/{id}` |
-| `getHealth(string $id)` † | `POST /domains/{id}/health` |
-| `getWarmupStatus(string $id)` † | `GET /domains/{id}/warmup` |
+| `getHealth(string $id)` | `POST /domains/{id}/health` |
+| `getWarmupStatus(string $id)` | `GET /domains/{id}/warmup` |
 
 ```php
 [$domain, $error] = CoffeeMail::getFacadeRoot()->domains->verify('dom_123');
@@ -350,11 +351,11 @@ Com `ShouldQueue`, `send()` enfileira o Mailable na fila padrão do Laravel; o t
 | `get(string $id)` | `GET /templates/{id}` |
 | `update(string $id, array $payload)` | `PATCH /templates/{id}` |
 | `delete(string $id)` | `DELETE /templates/{id}` |
-| `preview(array $payload)` † | `POST /templates/preview` (na v0.1.0 a assinatura é `preview(string $id, array $variables = [])` → `POST /templates/{id}/preview`) |
-| `previewById(string $id, array $variables = [])` † | `GET /templates/{id}` + `POST /templates/preview` |
-| `format(array $payload)` † | `POST /templates/format` |
-| `testRender(array $payload)` † | `POST /templates/test-render` |
-| `testSend(string $id, array $payload)` † | `POST /templates/{id}/test-send` |
+| `preview(array $payload)` | `POST /templates/preview` |
+| `previewById(string $id, array $variables = [])` | `GET /templates/{id}` + `POST /templates/preview` |
+| `format(array $payload)` | `POST /templates/format` |
+| `testRender(array $payload)` | `POST /templates/test-render` |
+| `testSend(string $id, array $payload)` | `POST /templates/{id}/test-send` |
 
 ```php
 [$templates, $error] = CoffeeMail::getFacadeRoot()->templates->list();
@@ -367,14 +368,18 @@ Com `ShouldQueue`, `send()` enfileira o Mailable na fila padrão do Laravel; o t
 | `create(array $payload)` | `POST /audiences` |
 | `list(array $query = [])` | `GET /audiences` |
 | `get(string $id)` | `GET /audiences/{id}` |
+| `update(string $id, array $payload)` | `PUT /audiences/{id}` |
 | `delete(string $id)` | `DELETE /audiences/{id}` |
-| `listContacts(string $audienceId, array $query = [])` | `GET /audiences/{id}/contacts` |
-| `addContact(string $audienceId, array $payload)` | `POST /audiences/{id}/contacts` |
-| `bulkAddContacts(string $audienceId, array $contacts)` | `POST /audiences/{id}/contacts/bulk` |
-| `removeContact(string $audienceId, string $contactId)` | `DELETE /audiences/{id}/contacts/{contactId}` |
+| `contacts->create(string $audienceId, array $payload)` | `POST /audiences/{id}/contacts` |
+| `contacts->list(string $audienceId, array $query = [])` | `GET /audiences/{id}/contacts` |
+| `contacts->bulkAdd(string $audienceId, array $contacts)` | `POST /audiences/{id}/contacts/bulk` |
+| `contacts->update(string $audienceId, string $contactId, array $payload)` | `PUT /audiences/{id}/contacts/{contactId}` |
+| `contacts->delete(string $audienceId, string $contactId)` | `DELETE /audiences/{id}/contacts/{contactId}` |
+
+`listContacts()`, `createContact()` e `bulkAddContacts()` continuam como atalhos para `contacts`.
 
 ```php
-[$contacts, $error] = CoffeeMail::getFacadeRoot()->audiences->listContacts('aud_123');
+[$contacts, $error] = CoffeeMail::getFacadeRoot()->audiences->contacts->list('aud_123');
 ```
 
 ### `broadcasts`
@@ -386,8 +391,9 @@ Com `ShouldQueue`, `send()` enfileira o Mailable na fila padrão do Laravel; o t
 | `get(string $id)` | `GET /broadcasts/{id}` |
 | `send(string $id)` | `POST /broadcasts/{id}/send` |
 | `cancel(string $id)` | `POST /broadcasts/{id}/cancel` |
-| `delete(string $id)` | Depreciado na `main`: retorna `ValidationError` sem chamada de rede (a API não expõe exclusão); na v0.1.0 chama `DELETE /broadcasts/{id}` |
-| `testSend(string $id, array $payload)` † | `POST /broadcasts/{id}/test-send` |
+| `testSend(string $id, array $payload)` | `POST /broadcasts/{id}/test-send` |
+
+Todas exigem chave `full_access`; sem ela, o erro é `PermissionError`. A API não tem exclusão de campanha: use `cancel()`.
 
 ```php
 [$broadcast, $error] = CoffeeMail::getFacadeRoot()->broadcasts->send('brd_123');
@@ -398,11 +404,11 @@ Com `ShouldQueue`, `send()` enfileira o Mailable na fila padrão do Laravel; o t
 | Método | Endpoint |
 | --- | --- |
 | `list(array $query = [])` | `GET /suppressions` |
-| `get(string $email)` | `GET /suppressions/{email}` |
+| `get(string $id)` | `GET /suppressions/{id}` |
 | `create(array $payload)` | `POST /suppressions` |
-| `delete(string $email)` | `DELETE /suppressions/{email}` |
-| `reactivate(string $id)` † | `POST /suppressions/{id}/reactivate` |
-| `bulkCreate(array $suppressions)` † | `POST /suppressions/bulk` |
+| `delete(string $id)` | `DELETE /suppressions/{id}` |
+| `reactivate(string $id)` | `POST /suppressions/{id}/reactivate` |
+| `bulkCreate(array $suppressions)` | `POST /suppressions/bulk` |
 
 ```php
 [$suppressions, $error] = CoffeeMail::getFacadeRoot()->suppressions->list();
@@ -415,13 +421,13 @@ Com `ShouldQueue`, `send()` enfileira o Mailable na fila padrão do Laravel; o t
 | `create(array\|WebhookPayload $payload)` | `POST /webhooks` |
 | `list(array $query = [])` | `GET /webhooks` |
 | `get(string $id)` | `GET /webhooks/{id}` |
-| `update(string $id, array $payload)` | `PATCH /webhooks/{id}` |
+| `update(string $id, array $payload)` | `PUT /webhooks/{id}` |
 | `delete(string $id)` | `DELETE /webhooks/{id}` |
-| `toggle(string $id, bool $enabled)` | `PATCH /webhooks/{id}` (na v0.1.0: `PATCH /webhooks/{id}/toggle`) |
+| `toggle(string $id, bool $enabled)` | `PATCH /webhooks/{id}` |
 | `rotateSecret(string $id)` | `POST /webhooks/{id}/rotate-secret` |
 | `test(string $id)` | `POST /webhooks/{id}/test` |
 | `listDeliveries(string $id, array $query = [])` | `GET /webhooks/{id}/deliveries` |
-| `Webhooks::verifySignature(string $payload, string $signature, string $secret)` (estático) | — |
+| `Webhooks::verifySignature(string $payload, string $secret, array $headers = [], ...)` (estático) | local; usado pelo middleware |
 
 ```php
 [$deliveries, $error] = CoffeeMail::getFacadeRoot()->webhooks->listDeliveries('wh_123');
@@ -437,7 +443,7 @@ Com `ShouldQueue`, `send()` enfileira o Mailable na fila padrão do Laravel; o t
 [$stats, $error] = CoffeeMail::getFacadeRoot()->stats->get(['from' => '2026-01-01', 'to' => '2026-01-31']);
 ```
 
-### `senders` †
+### `senders`
 
 | Método | Endpoint |
 | --- | --- |
@@ -455,9 +461,9 @@ Detalhes dos payloads de cada recurso: [README do SDK PHP](https://github.com/Co
 O ServiceProvider registra o alias de middleware `coffeemail.webhook` (`VerifyWebhookSignature`). Ele:
 
 1. Lê `coffeemail.webhook_secret`; se vazio, responde `500`.
-2. Lê a assinatura de `x-coffeemail-signature`, `coffeemail-signature` ou `signature`; se ausente, `401`.
-3. Valida com `CoffeeMail\Resources\Webhooks::verifySignature($corpoBruto, $assinatura, $segredo)`, que compara `hash_hmac('sha256', $corpoBruto, $segredo)` em tempo constante; se inválida, `401`.
-4. Despacha `CoffeeMail\Laravel\Events\WebhookReceived` com `payload` (corpo JSON decodificado em array) e `signature`, e segue para a rota.
+2. Lê a assinatura de `x-webhook-signature`; se ausente, `401`.
+3. Valida com `CoffeeMail\Resources\Webhooks::verifySignature()` do SDK PHP: `sha256=` + HMAC-SHA256 de `"{x-webhook-timestamp}.{x-webhook-idempotency-key}.{corpo bruto}"`, comparado em tempo constante, com o timestamp dentro de `coffeemail.webhook_tolerance` (padrão 300 s); se inválida, `401`.
+4. Despacha `CoffeeMail\Laravel\Events\WebhookReceived` com `payload` (corpo JSON decodificado), `signature`, `idempotencyKey` e `test` (`true` em disparos de teste), e segue para a rota.
 
 ```php
 use Illuminate\Support\Facades\Route;
@@ -481,51 +487,25 @@ final class ProcessarWebhookCoffeeMail
 
 Registre a rota fora do grupo `web` (ou exclua-a da verificação CSRF), já que o POST vem de servidor.
 
-### Incompatibilidade com a API atual
-
-Como descrito em [Status](#-status-do-projeto), a API envia:
+### Cabeçalhos enviados pela API
 
 | Cabeçalho | Conteúdo |
 | --- | --- |
 | `x-webhook-signature` | `sha256=` + HMAC-SHA256 hex de `"{timestamp}.{idempotencyKey}.{corpo}"` |
 | `x-webhook-timestamp` | Unix epoch em segundos |
-| `x-webhook-idempotency-key` | 16 caracteres hex, único por entrega |
-| `x-webhook-test` | Presente em entregas de teste (`POST /webhooks/{id}/test`) |
+| `x-webhook-idempotency-key` | 16 caracteres hex; muda a cada tentativa de entrega, então não serve para deduplicar retentativas |
+| `x-webhook-test` | `true` em entregas de teste (`POST /webhooks/{id}/test`) |
 
-O middleware não lê nenhum desses cabeçalhos, então rejeita toda entrega real. Até o pacote ser corrigido, valide na própria aplicação seguindo o esquema da API (a API usa janela de 300 s ao verificar o timestamp):
-
-```php
-use Closure;
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
-
-final class VerifyCoffeeMailWebhook
-{
-    public function handle(Request $request, Closure $next): Response
-    {
-        $secret = (string) config('coffeemail.webhook_secret');
-        $signature = (string) $request->header('x-webhook-signature');
-        $timestamp = (string) $request->header('x-webhook-timestamp');
-        $idempotencyKey = (string) $request->header('x-webhook-idempotency-key');
-
-        $expected = 'sha256=' . hash_hmac('sha256', "{$timestamp}.{$idempotencyKey}.{$request->getContent()}", $secret);
-
-        abort_unless($secret !== '' && ctype_digit($timestamp) && abs(time() - (int) $timestamp) <= 300, 401);
-        abort_unless(hash_equals($expected, $signature), 401);
-
-        return $next($request);
-    }
-}
-```
+O corpo traz `event_type`, `webhook_id` e `data`; `data` varia por evento e não inclui o id do email.
 
 Eventos emitidos pela API (`event_type`): `email.queued`, `email.scheduled`, `email.processing`, `email.sent`, `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.failed`, `email.cancelled`, `email.suppressed`, `email.complained`, `email.opened`, `email.clicked`, `email.unsubscribed`.
 
 ## 🔖 Versionamento e releases
 
-- SemVer. Versão publicada: **v0.1.0**. A versão vem da tag Git; `composer.json` não tem campo `version`.
-- **Compatibilidade retroativa:** o pacote é instalado por clientes; a superfície pública (nome do transport `coffeemail`, alias `coffeemail.webhook`, chaves de config, classes `CoffeeMailServiceProvider`, `CoffeeMailTransport`, `VerifyWebhookSignature`, `WebhookReceived`, facade `CoffeeMail`) só recebe adições e depreciações; nada é renomeado nem removido.
+- SemVer. Versão publicada: **v0.1.0**; a `main` está em **0.2.0** (não publicada). A versão vem da tag Git; `composer.json` não tem campo `version`.
+- **Compatibilidade retroativa:** a `0.2.0` foi a exceção (corrigiu o middleware enquanto ainda não havia usuários ativos). A partir dela, a superfície pública (nome do transport `coffeemail`, alias `coffeemail.webhook`, chaves de config, classes `CoffeeMailServiceProvider`, `CoffeeMailTransport`, `VerifyWebhookSignature`, `WebhookReceived`, facade `CoffeeMail`) só recebe adições e depreciações; nada é renomeado nem removido.
 - **Publicação:** push de uma tag `v*` dispara `.github/workflows/release.yml`, que valida o `composer.json`, instala dependências (SDK PHP via repositório VCS), roda `composer check` e cria o GitHub Release com notas geradas automaticamente. O Packagist lê a tag do repositório.
-- Não há `CHANGELOG.md`; o histórico está nas GitHub Releases e no `git log`.
+- Mudanças em [CHANGELOG.md](CHANGELOG.md), no formato Keep a Changelog.
 
 ## 🧪 Testes e qualidade
 

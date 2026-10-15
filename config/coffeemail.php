@@ -25,8 +25,17 @@ return [
     |--------------------------------------------------------------------------
     | Segredo do Webhook (HMAC SHA-256)
     |--------------------------------------------------------------------------
-    | Segredo criptográfico utilizado pelo middleware nativo para validar a
-    | autenticidade das notificações de eventos recebidas da plataforma.
+    | Segredo (whsec_...) usado pelo middleware coffeemail.webhook para validar
+    | a assinatura x-webhook-signature das entregas recebidas da plataforma.
     */
     'webhook_secret' => env('COFFEEMAIL_WEBHOOK_SECRET'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tolerância do Timestamp do Webhook (segundos)
+    |--------------------------------------------------------------------------
+    | Janela aceita entre o x-webhook-timestamp da entrega e o relógio local.
+    | Entregas fora dela são rejeitadas para impedir replay. Padrão: 300.
+    */
+    'webhook_tolerance' => env('COFFEEMAIL_WEBHOOK_TOLERANCE', 300),
 ];
