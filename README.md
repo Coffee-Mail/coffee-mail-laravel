@@ -586,12 +586,13 @@ coffee-mail-laravel/
 | [coffee-mail-sdk-php](https://github.com/Coffee-Mail/coffee-mail-sdk-php) | SDK oficial PHP (`coffeemail/coffeemail-php`); base deste pacote |
 | [coffee-mail-sdk-java](https://github.com/Coffee-Mail/coffee-mail-sdk-java) | SDK oficial Java (`br.com.coffeemail:coffeemail-java`) |
 | [coffee-mail-sdk-go](https://github.com/Coffee-Mail/coffee-mail-sdk-go) | SDK oficial Go (`github.com/Coffee-Mail/coffee-mail-sdk-go`) |
+| [coffee-mail-sdk-ruby](https://github.com/Coffee-Mail/coffee-mail-sdk-ruby) | SDK oficial Ruby (`coffeemail`) |
 | **coffee-mail-laravel** (você está aqui) | Integração Laravel (`coffeemail/coffeemail-laravel`): mail transport + facade |
 | [coffee-mail-sdk-workbench](https://github.com/Coffee-Mail/coffee-mail-sdk-workbench) | Bancada de validação dos SDKs por spec |
 
 ## 📄 Licença
 
-**CoffeeMail SDK License**, licença proprietária ([LICENSE](LICENSE); `composer.json` declara `"license": "proprietary"`). Diferente dos SDKs Node, Python, PHP, Java e Go, que são MIT. Em resumo:
+**CoffeeMail SDK License**, licença proprietária ([LICENSE](LICENSE); `composer.json` declara `"license": "proprietary"`). Diferente dos SDKs Node, Python, PHP, Java, Go e Ruby, que são MIT. Em resumo:
 
 - Copyright da CoffeeMail, todos os direitos reservados. O software é licenciado, não vendido.
 - Uso permitido somente mediante acordo de licença comercial escrito e assinado por representante autorizado da CoffeeMail. A cópia em registros públicos (Packagist) serve apenas para integração por clientes autorizados da plataforma.
